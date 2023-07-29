@@ -50,7 +50,7 @@ pub mod math;
 mod util_tests {
     use std::vec;
 
-    use crate::utils::math::{cosine_similarity, norm, dot};
+    use crate::utils::math::{cosine_similarity, dot, norm};
 
     use super::*;
     #[test]

@@ -1,11 +1,13 @@
 #[derive(Clone, Debug)]
 pub struct Event {
     user_id: String,
-    target_id: String
+    target_id: String,
 }
 
 impl Event {
-    pub fn new(user_id: String, target_id: String) -> Self { Self { user_id, target_id } }
+    pub fn new(user_id: String, target_id: String) -> Self {
+        Self { user_id, target_id }
+    }
 
     pub fn user_id(&self) -> &str {
         self.user_id.as_ref()
@@ -17,10 +19,12 @@ impl Event {
 }
 
 pub struct RecommendationResponse {
-    recommendations: Vec<String>
+    recommendations: Vec<String>,
 }
 
 impl RecommendationResponse {
     /// Creates a new [`RecommendationResponse`].
-    pub fn new(recommendations: Vec<String>) -> Self { Self { recommendations } }
+    pub fn new(recommendations: Vec<String>) -> Self {
+        Self { recommendations }
+    }
 }

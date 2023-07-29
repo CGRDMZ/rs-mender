@@ -1,8 +1,11 @@
-use std::{collections::HashMap, path::Path, fs::File, io::BufWriter, time::Instant};
+use std::{collections::HashMap, fs::File, io::BufWriter, path::Path, time::Instant};
 
 use crate::{
     core::{self, model::Event, similarity},
-    utils::{UserItemMatrix, construct_user_item_matrix, construct_item_user_matrix, math::cosine_similarity },
+    utils::{
+        construct_item_user_matrix, construct_user_item_matrix, math::cosine_similarity,
+        UserItemMatrix,
+    },
 };
 
 pub struct CosineSimilarityEngineInMemory {
@@ -46,9 +49,12 @@ impl similarity::SimilarityEngine for CosineSimilarityEngineInMemory {
         let path = Path::new("./data/output.json");
         let file = File::create(path).unwrap();
         let writer_buf = BufWriter::new(file);
-        let filter_no_recs: HashMap<&String, &Vec<(String, f64)>> = similarities.iter().filter(|i| i.1.len() != 0).collect();
-        println!("{:?}", serde_json::to_writer_pretty(writer_buf, &filter_no_recs));
-
+        let filter_no_recs: HashMap<&String, &Vec<(String, f64)>> =
+            similarities.iter().filter(|i| i.1.len() != 0).collect();
+        println!(
+            "{:?}",
+            serde_json::to_writer_pretty(writer_buf, &filter_no_recs)
+        );
     }
 
     fn find_similar_by_user_id(

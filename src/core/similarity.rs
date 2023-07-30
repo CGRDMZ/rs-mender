@@ -3,7 +3,7 @@ use super::model::{Event, RecommendationResponse};
 pub trait SimilarityEngine {
     fn add_event(&mut self, event: Event);
 
-    fn train(self);
+    fn train(&mut self);
 
     fn find_similar_by_user_id(
         user_id: String,

@@ -45,6 +45,7 @@ impl similarity::SimilarityEngine for CosineSimilarityEngineInMemory {
         let mut similarities: DetailedRecommendations = HashMap::new();
         for (item_id, users) in item_user_matrix {
             let a = similarities.entry(item_id.clone()).or_default();
+
             for (item_id_2, users_2) in item_user_matrix {
                 let c_sim = cosine_similarity(users, users_2);
                 if c_sim == 0f64 || item_id == item_id_2 {
@@ -60,10 +61,12 @@ impl similarity::SimilarityEngine for CosineSimilarityEngineInMemory {
         let path = Path::new("./data/output.json");
         let file = File::create(path).unwrap();
         let writer_buf = BufWriter::new(file);
-        let filter_no_recs= similarities
+        let filter_no_recs = similarities
             .iter()
             .filter(|i| i.1.len() != 0)
-            .map(|(product_id, recs)| (product_id.clone(), recs.iter().take(10).collect::<Vec<_>>()))
+            .map(|(product_id, recs)| {
+                (product_id.clone(), recs.iter().take(10).collect::<Vec<_>>())
+            })
             .collect::<HashMap<_, _>>();
 
         println!(

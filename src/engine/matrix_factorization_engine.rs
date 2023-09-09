@@ -1,5 +1,6 @@
 use std::fs::File;
 
+use itertools::Itertools;
 use ndarray::{Array, Array2};
 use ndarray_rand::{
     rand,
@@ -27,7 +28,7 @@ impl MatrixFactorizationEngine {
 
 impl SimilarityEngine for MatrixFactorizationEngine {
     fn train(&mut self) {
-        let latent_factors = 5;
+        let latent_factors = 10;
 
         let learning_rate = 0.01;
         let lambda = 0.1;
@@ -54,22 +55,49 @@ impl SimilarityEngine for MatrixFactorizationEngine {
                 let updated_row_u = &(&u_matrix.row(i) - learning_rate * delta_u);
                 let updated_row_v = &(&v_matrix.row(j) - learning_rate * delta_v);
 
-                u_matrix
-                    .row_mut(i)
-                    .assign(updated_row_u);
-                v_matrix
-                    .row_mut(j)
-                    .assign(updated_row_v);
+                u_matrix.row_mut(i).assign(updated_row_u);
+                v_matrix.row_mut(j).assign(updated_row_v);
             }
         }
 
+        // check mpr on train data, should use a seperate data later!
         // Use the factorized matrices for predictions
         let predicted_matrix = u_matrix.dot(&v_matrix.t());
 
-        serde_json::to_writer_pretty(File::create("./data/predictions.json").unwrap(), &predicted_matrix).unwrap();
+        let mut total_mpr = 0f64;
+        for ui in 0..self.dataset.user_idx.size() {
+            let actual = self.dataset.cui.outer_view(ui).unwrap();
+            let recommendations = predicted_matrix
+                .row(ui)
+                .iter()
+                .enumerate()
+                .sorted_by(|(_, &a), (_, &b)| b.partial_cmp(&a).unwrap())
+                .map(|(item_idx, _)| item_idx)
+                .collect::<Vec<_>>();
+
+            let mut percentile_rank_summation = 0f64;
+            for (actual_item_idx, _) in actual.iter() {
+                let rank = recommendations
+                    .iter()
+                    .position(|&rec_item| actual_item_idx == rec_item)
+                    .unwrap();
+
+                let percentile_rank = (rank + 1) as f64 / recommendations.len() as f64;
+                percentile_rank_summation += percentile_rank;
+            }
+            let user_mpr = percentile_rank_summation / actual.iter().count() as f64;
+            total_mpr += user_mpr;
+        }
+
+        let mpr = total_mpr / self.dataset.user_idx.size() as f64;
+
+        println!("Mean Percentile Rank (MPR): {:.4}", mpr);
+
+        // serde_json::to_writer_pretty(File::create("./data/predictions.json").unwrap(), &predicted_matrix).unwrap();
     }
 
     fn find_similar_by_user_id(
+        &self,
         user_id: String,
         n_items: usize,
     ) -> Result<RecommendationResponse, ()> {
@@ -77,6 +105,7 @@ impl SimilarityEngine for MatrixFactorizationEngine {
     }
 
     fn find_similar_by_target_id(
+        &self,
         target_id: String,
         n_items: usize,
     ) -> Result<RecommendationResponse, ()> {

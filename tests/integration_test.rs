@@ -14,3 +14,16 @@ fn foo2() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn foo() -> Result<(), Error> {
+
+    let dataset = Dataset::from_jsonl("./data/test_data.jsonl".to_string());
+
+
+    let mut engine = MatrixFactorizationEngine::new(dataset);
+
+    engine.train();
+
+    Ok(())
+}

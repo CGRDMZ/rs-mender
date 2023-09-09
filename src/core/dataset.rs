@@ -36,8 +36,6 @@ impl Dataset {
         let user_size = user_idx.size();
         let item_size = item_idx.size();
 
-        println!("size: {user_size} {item_size}");
-
 
         // construct csr matrix
         let mut cui_trimat: TriMat<u32> = TriMat::new((user_size, item_size));
@@ -49,7 +47,6 @@ impl Dataset {
                 let user_idx = user_idx.get_idx(e.user_id().to_string());
                 let item_idx = item_idx.get_idx(e.target_id().to_string());
 
-                println!("{user_idx} {item_idx}");
                 cui_trimat.add_triplet(user_idx, item_idx, 1);
             });
         });

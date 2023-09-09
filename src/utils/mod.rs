@@ -45,6 +45,7 @@ pub fn construct_item_user_matrix(events: &Vec<Event>) -> ItemUserMatrix {
 }
 
 pub mod math;
+pub mod dataset;
 
 #[cfg(test)]
 mod util_tests {

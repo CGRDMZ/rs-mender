@@ -1,45 +1,16 @@
-mod test_utils;
+use std::fmt::Error;
 
-use std::{
-    path::Path,
-    sync::{Arc, Mutex},
-};
-
-use csv::Error;
-use rs_mender::{
-    core::{model::Event, similarity::SimilarityEngine},
-    engine::cosine_similarity_engine::CosineSimilarityEngineInMemory,
-};
-use test_utils::{read_ecommerce_data, read_test_data};
-
-use crate::test_utils::TestEvent;
+use rs_mender::{engine::matrix_factorization_engine::MatrixFactorizationEngine, core::{dataset::Dataset, similarity::SimilarityEngine}};
 
 #[test]
-fn foo() -> Result<(), Error> {
-    let engine = Arc::new(Mutex::new(CosineSimilarityEngineInMemory::new()));
+fn foo2() -> Result<(), Error> {
 
-    read_test_data(Path::new("data/test_data.jsonl"), 3, |e| {
-        let events = e.to_events();
-        events
-            .iter()
-            .for_each(|e| engine.lock().unwrap().add_event(e.clone()));
-    });
+    let dataset = Dataset::from_jsonl("./data/test_data.jsonl".to_string());
 
-    engine.lock().unwrap().train();
 
-    Ok(())
-}
+    let mut engine = MatrixFactorizationEngine::new(dataset);
 
-#[test]
-fn bar() -> Result<(), Error> {
-    let engine = Arc::new(Mutex::new(CosineSimilarityEngineInMemory::new()));
-
-    read_ecommerce_data(Path::new("data/data.csv"), |e| {
-        let e = e;
-        engine.lock().unwrap().add_event(e)
-    });
-
-    engine.lock().unwrap().train();
+    engine.train();
 
     Ok(())
 }

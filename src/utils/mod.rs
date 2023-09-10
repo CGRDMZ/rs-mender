@@ -44,6 +44,10 @@ pub fn construct_item_user_matrix(events: &Vec<Event>) -> ItemUserMatrix {
     item_user_matrix
 }
 
+pub fn approx_equal(a: f64, b: f64, epsilon: f64) -> bool {
+    (a - b).abs() < epsilon
+}
+
 pub mod math;
 pub mod dataset;
 

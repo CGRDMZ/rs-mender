@@ -9,12 +9,12 @@ use ndarray_rand::{
 };
 use sprs::TriMat;
 
-use crate::core::{
+use crate::{core::{
     dataset::Dataset,
     item_index::ItemIndex,
     model::{Event, RecommendationResponse},
     similarity::SimilarityEngine,
-};
+}, utils::approx_equal};
 
 pub struct MatrixFactorizationEngine {
     dataset: Dataset,
@@ -31,19 +31,26 @@ impl SimilarityEngine for MatrixFactorizationEngine {
         let latent_factors = 10;
 
         let learning_rate = 0.01;
-        let lambda = 0.1;
+        let lambda = 0.01;
 
-        let n_iter = 1000;
+        let n_iter = 100;
 
         let user_size = self.dataset.user_idx.size();
         let item_size = self.dataset.item_idx.size();
 
-        let mut random = rand::thread_rng();
+        let mut best_u_matrix = Array::random((user_size, latent_factors), Uniform::new(-1f64, 1f64));
+        let mut best_v_matrix = Array::random((item_size, latent_factors), Uniform::new(-1f64, 1f64));
 
-        let mut u_matrix = Array::random((user_size, latent_factors), Uniform::new(-1f64, 1f64));
-        let mut v_matrix = Array::random((item_size, latent_factors), Uniform::new(-1f64, 1f64));
+        let mut u_matrix = Array::random((user_size, latent_factors), Uniform::new(-0.1, 0.1));
+        let mut v_matrix = Array::random((item_size, latent_factors), Uniform::new(-0.1, 0.1));
+        let mut previous_validation_err = f64::MAX;
+
+        let mut patience_count = 0;
+
+        let non_zero_value_count = self.dataset.cui.iter().count();
 
         for _ in 0..n_iter {
+            let mut validation_err = 0.0;
             for (v, (i, j)) in self.dataset.cui.iter() {
                 let pred = u_matrix.row(i).dot(&v_matrix.row(j).t());
                 let error = f64::from(*v) - pred;
@@ -57,12 +64,37 @@ impl SimilarityEngine for MatrixFactorizationEngine {
 
                 u_matrix.row_mut(i).assign(updated_row_u);
                 v_matrix.row_mut(j).assign(updated_row_v);
+
+                validation_err += error * error;
+
             }
+            validation_err /= non_zero_value_count as f64;
+            validation_err = validation_err.sqrt();
+
+            println!("RMSE: {}", validation_err);
+            
+            if validation_err < previous_validation_err && !approx_equal(validation_err, previous_validation_err, 1e-3) {
+                previous_validation_err = validation_err;
+
+                best_u_matrix = u_matrix.clone();
+                best_v_matrix = v_matrix.clone();
+
+                patience_count = 0;
+            } else {
+                patience_count += 1;
+                if patience_count >= 5 {
+                    println!("early breaking...");
+                    break;
+                }
+            }
+
         }
 
         // check mpr on train data, should use a seperate data later!
         // Use the factorized matrices for predictions
-        let predicted_matrix = u_matrix.dot(&v_matrix.t());
+        let predicted_matrix = best_u_matrix.dot(&best_v_matrix.t());
+
+        println!("{}", predicted_matrix.iter().filter(|v| v.is_nan()).count());
 
         let mut total_mpr = 0f64;
         for ui in 0..self.dataset.user_idx.size() {
@@ -71,7 +103,9 @@ impl SimilarityEngine for MatrixFactorizationEngine {
                 .row(ui)
                 .iter()
                 .enumerate()
-                .sorted_by(|(_, &a), (_, &b)| b.partial_cmp(&a).unwrap())
+                .sorted_by(|(_, &a), (_, &b)| {
+                    b.partial_cmp(&a).unwrap()
+                })
                 .map(|(item_idx, _)| item_idx)
                 .collect::<Vec<_>>();
 
@@ -93,7 +127,8 @@ impl SimilarityEngine for MatrixFactorizationEngine {
 
         println!("Mean Percentile Rank (MPR): {:.4}", mpr);
 
-        // serde_json::to_writer_pretty(File::create("./data/predictions.json").unwrap(), &predicted_matrix).unwrap();
+        serde_json::to_writer_pretty(File::create("./data/best_u_matrix.json").unwrap(), &u_matrix).unwrap();
+        serde_json::to_writer_pretty(File::create("./data/best_v_matrix.json").unwrap(), &v_matrix).unwrap();
     }
 
     fn find_similar_by_user_id(

@@ -49,7 +49,7 @@ pub struct ECommerceRecord {
     product_id: Option<String>,
 }
 
-pub fn read_ecommerce_data<F: Fn(Event)>(path: &Path, on_event: F) {
+pub fn read_ecommerce_data<F: FnMut(Event)>(path: &Path, mut on_event: F) {
     let mut reader = csv::Reader::from_path(path).unwrap();
 
     for record in reader.deserialize() {

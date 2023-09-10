@@ -18,7 +18,7 @@ fn foo2() -> Result<(), Error> {
 #[test]
 fn foo() -> Result<(), Error> {
 
-    let dataset = Dataset::from_jsonl("./data/test_data.jsonl".to_string());
+    let dataset = Dataset::from_csv_example();
 
 
     let mut engine = MatrixFactorizationEngine::new(dataset);

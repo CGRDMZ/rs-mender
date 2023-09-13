@@ -33,6 +33,10 @@ impl ItemIndex {
         self.index_to_item.get(idx).unwrap().clone()
     }
 
+    pub fn has_item(&self, item: String) -> bool {
+        self.item_to_index.contains_key(&item)
+    }
+
     pub fn size(&self) -> usize {
         self.index_to_item.len()
     }
@@ -68,6 +72,12 @@ mod test {
 
         let idx = item_idx.get_idx("d".to_string());
         assert_eq!(3, idx);
+
+        let exists = item_idx.has_item("a".to_string());
+        assert!(exists);
+
+        let exists = item_idx.has_item("x".to_string());
+        assert!(!exists);
     }
 
 }

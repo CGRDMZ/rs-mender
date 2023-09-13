@@ -32,7 +32,7 @@ impl Dataset {
 
         // learn the indexes in the data. Also gives us the information about how many users and items in it.
         // might need to find a better solution in the future because we need to go through the dataset twice in this case.
-        dataset::read_test_data(Path::new(&path), 2, |e| {
+        dataset::read_test_data(Path::new(&path), 0, |e| {
             let events = e.to_events();
 
             events.iter().for_each(|e| {

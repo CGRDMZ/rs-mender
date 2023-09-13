@@ -10,7 +10,10 @@ fn foo2() -> Result<(), Error> {
 
     let mut engine = MatrixFactorizationEngine::new(dataset);
 
+
     engine.train();
+
+    println!("{:?}", engine.find_similar_by_user_id("0fb1e031d84a".to_string(), 10));
 
     Ok(())
 }
@@ -25,5 +28,6 @@ fn foo() -> Result<(), Error> {
 
     engine.train();
 
+    println!("{:?}", engine.find_similar_by_user_id("17850".to_string(), 10));
     Ok(())
 }

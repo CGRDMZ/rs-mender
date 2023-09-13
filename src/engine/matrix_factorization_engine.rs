@@ -1,7 +1,7 @@
 use std::fs::File;
 
 use itertools::Itertools;
-use ndarray::{Array, Array2};
+use ndarray::{Array, Array1, Array2};
 use ndarray_rand::{
     rand,
     rand_distr::{Distribution, Standard, Uniform},
@@ -9,26 +9,90 @@ use ndarray_rand::{
 };
 use sprs::TriMat;
 
-use crate::{core::{
-    dataset::Dataset,
-    item_index::ItemIndex,
-    model::{Event, RecommendationResponse},
-    similarity::SimilarityEngine,
-}, utils::approx_equal};
+use crate::{
+    core::{
+        dataset::Dataset,
+        item_index::ItemIndex,
+        model::{Event, RecommendationResponse},
+        similarity::SimilarityEngine,
+    },
+    utils::approx_equal,
+};
 
 pub struct MatrixFactorizationEngine {
     dataset: Dataset,
+    u_matrix: Option<Array2<f64>>,
+    v_matrix: Option<Array2<f64>>,
 }
 
 impl MatrixFactorizationEngine {
     pub fn new(dataset: Dataset) -> Self {
-        Self { dataset }
+        Self {
+            dataset,
+            u_matrix: None,
+            v_matrix: None,
+        }
+    }
+
+    fn internal_predict(&self, user_idx: usize) -> Array1<(usize, f64)> {
+        // if the model is not trained yet we panic, we should handle this gracefully in the future.
+        match (&self.u_matrix, &self.v_matrix) {
+            (Some(u_matrix), Some(v_matrix)) => {
+                let item_recs = u_matrix
+                    .row(user_idx)
+                    .dot(&v_matrix.t())
+                    .indexed_iter()
+                    .sorted_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap())
+                    .map(|(a, &b)| (a, b))
+                    .collect::<Array1<_>>();
+
+                item_recs
+            }
+            (_, _) => {
+                panic!("you should train the model before making a prediction")
+            }
+        }
+    }
+
+    pub fn calculate_mpr(&self) -> f64 {
+        // if the model is not trained yet we panic, we should handle this gracefully in the future.
+        match (&self.u_matrix, &self.v_matrix) {
+            (Some(_), Some(_)) => {
+                let mut total_mpr = 0f64;
+                for user_idx in 0..self.dataset.user_idx.size() {
+                    let actual = self.dataset.cui.outer_view(user_idx).unwrap();
+                    let recommendations = self.internal_predict(user_idx);
+
+                    let mut percentile_rank_summation = 0f64;
+                    for (actual_item_idx, _) in actual.iter() {
+                        let rank = recommendations
+                            .iter()
+                            .position(|(item_idx, _)| actual_item_idx == *item_idx)
+                            .unwrap();
+
+                        let percentile_rank = (rank + 1) as f64 / recommendations.len() as f64;
+                        percentile_rank_summation += percentile_rank;
+                    }
+                    let user_mpr = percentile_rank_summation / actual.iter().count() as f64;
+                    total_mpr += user_mpr;
+                }
+
+                let mpr = total_mpr / self.dataset.user_idx.size() as f64;
+
+                println!("Mean Percentile Rank (MPR): {:.4}", mpr);
+
+                mpr
+            }
+            (_, _) => {
+                panic!("you should train the model before calculating mpr")
+            }
+        }
     }
 }
 
 impl SimilarityEngine for MatrixFactorizationEngine {
     fn train(&mut self) {
-        let latent_factors = 10;
+        let latent_factors = 30;
 
         let learning_rate = 0.01;
         let lambda = 0.01;
@@ -37,9 +101,6 @@ impl SimilarityEngine for MatrixFactorizationEngine {
 
         let user_size = self.dataset.user_idx.size();
         let item_size = self.dataset.item_idx.size();
-
-        let mut best_u_matrix = Array::random((user_size, latent_factors), Uniform::new(-1f64, 1f64));
-        let mut best_v_matrix = Array::random((item_size, latent_factors), Uniform::new(-1f64, 1f64));
 
         let mut u_matrix = Array::random((user_size, latent_factors), Uniform::new(-0.1, 0.1));
         let mut v_matrix = Array::random((item_size, latent_factors), Uniform::new(-0.1, 0.1));
@@ -66,18 +127,19 @@ impl SimilarityEngine for MatrixFactorizationEngine {
                 v_matrix.row_mut(j).assign(updated_row_v);
 
                 validation_err += error * error;
-
             }
             validation_err /= non_zero_value_count as f64;
             validation_err = validation_err.sqrt();
 
             println!("RMSE: {}", validation_err);
-            
-            if validation_err < previous_validation_err && !approx_equal(validation_err, previous_validation_err, 1e-3) {
+
+            if validation_err < previous_validation_err
+                && !approx_equal(validation_err, previous_validation_err, 1e-3)
+            {
                 previous_validation_err = validation_err;
 
-                best_u_matrix = u_matrix.clone();
-                best_v_matrix = v_matrix.clone();
+                self.u_matrix = Some(u_matrix.clone());
+                self.v_matrix = Some(v_matrix.clone());
 
                 patience_count = 0;
             } else {
@@ -87,56 +149,44 @@ impl SimilarityEngine for MatrixFactorizationEngine {
                     break;
                 }
             }
-
         }
 
-        // check mpr on train data, should use a seperate data later!
-        // Use the factorized matrices for predictions
-        let predicted_matrix = best_u_matrix.dot(&best_v_matrix.t());
+        // should not have any NaN values
+        assert_eq!(0, self.u_matrix.clone().unwrap().iter().filter(|v| v.is_nan()).count());
+        assert_eq!(0, self.v_matrix.clone().unwrap().iter().filter(|v| v.is_nan()).count());
 
-        println!("{}", predicted_matrix.iter().filter(|v| v.is_nan()).count());
+        self.calculate_mpr();
 
-        let mut total_mpr = 0f64;
-        for ui in 0..self.dataset.user_idx.size() {
-            let actual = self.dataset.cui.outer_view(ui).unwrap();
-            let recommendations = predicted_matrix
-                .row(ui)
-                .iter()
-                .enumerate()
-                .sorted_by(|(_, &a), (_, &b)| {
-                    b.partial_cmp(&a).unwrap()
-                })
-                .map(|(item_idx, _)| item_idx)
-                .collect::<Vec<_>>();
-
-            let mut percentile_rank_summation = 0f64;
-            for (actual_item_idx, _) in actual.iter() {
-                let rank = recommendations
-                    .iter()
-                    .position(|&rec_item| actual_item_idx == rec_item)
-                    .unwrap();
-
-                let percentile_rank = (rank + 1) as f64 / recommendations.len() as f64;
-                percentile_rank_summation += percentile_rank;
-            }
-            let user_mpr = percentile_rank_summation / actual.iter().count() as f64;
-            total_mpr += user_mpr;
-        }
-
-        let mpr = total_mpr / self.dataset.user_idx.size() as f64;
-
-        println!("Mean Percentile Rank (MPR): {:.4}", mpr);
-
-        serde_json::to_writer_pretty(File::create("./data/best_u_matrix.json").unwrap(), &u_matrix).unwrap();
-        serde_json::to_writer_pretty(File::create("./data/best_v_matrix.json").unwrap(), &v_matrix).unwrap();
+        serde_json::to_writer_pretty(
+            File::create("./data/best_u_matrix.json").unwrap(),
+            &u_matrix,
+        )
+        .unwrap();
+        serde_json::to_writer_pretty(
+            File::create("./data/best_v_matrix.json").unwrap(),
+            &v_matrix,
+        )
+        .unwrap();
     }
 
     fn find_similar_by_user_id(
-        &self,
+        &mut self,
         user_id: String,
         n_items: usize,
     ) -> Result<RecommendationResponse, ()> {
-        todo!()
+        let user_idx = self.dataset.user_idx.get_idx(user_id);
+
+        let binding = self.internal_predict(user_idx);
+        let predictions = binding
+            .iter()
+            .map(|(i, v)| {
+                let item = self.dataset.item_idx.get_item(*i);
+                (item, v)
+            })
+            .take(n_items)
+            .collect_vec();
+        println!("{:?}", predictions);
+        Err(())
     }
 
     fn find_similar_by_target_id(

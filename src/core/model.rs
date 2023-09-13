@@ -18,6 +18,7 @@ impl Event {
     }
 }
 
+#[derive(Debug)]
 pub struct RecommendationResponse {
     recommendations: Vec<String>,
 }

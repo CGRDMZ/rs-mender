@@ -152,8 +152,24 @@ impl SimilarityEngine for MatrixFactorizationEngine {
         }
 
         // should not have any NaN values
-        assert_eq!(0, self.u_matrix.clone().unwrap().iter().filter(|v| v.is_nan()).count());
-        assert_eq!(0, self.v_matrix.clone().unwrap().iter().filter(|v| v.is_nan()).count());
+        assert_eq!(
+            0,
+            self.u_matrix
+                .clone()
+                .unwrap()
+                .iter()
+                .filter(|v| v.is_nan())
+                .count()
+        );
+        assert_eq!(
+            0,
+            self.v_matrix
+                .clone()
+                .unwrap()
+                .iter()
+                .filter(|v| v.is_nan())
+                .count()
+        );
 
         self.calculate_mpr();
 

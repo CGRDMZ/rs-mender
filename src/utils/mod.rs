@@ -48,8 +48,8 @@ pub fn approx_equal(a: f64, b: f64, epsilon: f64) -> bool {
     (a - b).abs() < epsilon
 }
 
-pub mod math;
 pub mod dataset;
+pub mod math;
 
 #[cfg(test)]
 mod util_tests {

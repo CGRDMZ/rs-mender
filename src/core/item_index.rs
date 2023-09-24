@@ -55,14 +55,16 @@ mod test {
 
         let mut item_idx = ItemIndex::new();
 
-        let ids = v.iter().map(|&i| {item_idx.get_idx(i.to_string())}).collect::<Vec<_>>();
-    
+        let ids = v
+            .iter()
+            .map(|&i| item_idx.get_idx(i.to_string()))
+            .collect::<Vec<_>>();
 
-        assert_eq!((0..4).collect::<Vec<_>>(), ids.clone().into_iter().unique().collect_vec());
+        assert_eq!(
+            (0..4).collect::<Vec<_>>(),
+            ids.clone().into_iter().unique().collect_vec()
+        );
         println!("{:?}", ids);
-
-
-
 
         let idx = item_idx.get_idx("c".to_string());
         assert_eq!(2, idx);
@@ -79,5 +81,4 @@ mod test {
         let exists = item_idx.has_item("x".to_string());
         assert!(!exists);
     }
-
 }

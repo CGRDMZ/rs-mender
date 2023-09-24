@@ -47,7 +47,7 @@ impl Dataset {
         // construct csr matrix
         let mut cui_trimat: TriMat<u32> = TriMat::new((user_size, item_size));
 
-        dataset::read_test_data(Path::new(&path), 2, |e| {
+        dataset::read_test_data(Path::new(&path), 0, |e| {
             let events = e.to_events();
 
             events.iter().for_each(|e| {
@@ -59,13 +59,13 @@ impl Dataset {
         });
 
         let cui: CsMat<u32> = cui_trimat.to_csr();
-        let ciu: CsMat<u32> = cui.clone();
+        let ciu: CsMat<u32> = cui.clone().transpose_into();
 
         println!("shape of the user-item matrix: {:?}", cui.shape());
 
         Dataset {
             cui: cui,
-            ciu: ciu, // is this field necessary? If so do not forget to provide the correct value!
+            ciu: ciu,
             user_idx,
             item_idx,
         }
